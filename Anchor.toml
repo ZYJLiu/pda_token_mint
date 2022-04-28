@@ -1,7 +1,10 @@
 [features]
 seeds = false
 [programs.localnet]
-pda_token = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+pda_token = "AA6w4TWeM86CJ1CzMsnxboF9d97xQLbcKXBz2vUtkQS7"
+
+[programs.devnet]
+pda_token = "AA6w4TWeM86CJ1CzMsnxboF9d97xQLbcKXBz2vUtkQS7"
 
 [registry]
 url = "https://anchor.projectserum.com"

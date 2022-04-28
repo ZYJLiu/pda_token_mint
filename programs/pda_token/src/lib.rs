@@ -1,7 +1,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount,};
 
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("AA6w4TWeM86CJ1CzMsnxboF9d97xQLbcKXBz2vUtkQS7");
+
+
+pub const MINT_ADDRESS: &str = "HpK7u61kJEeoCUn8iMay7A8VzxWSovDL35FMvqLA9LsJ";
 
 #[program]
 pub mod pda_token {
@@ -26,6 +29,21 @@ pub mod pda_token {
             &signer,
         );
         token::mint_to(cpi_ctx, amount)?;
+
+        Ok(())
+    }
+
+    pub fn burn(ctx: Context<Burn>,  mint_authority_bump: u8, amount: u64) -> Result<()> {
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token::Burn {
+                mint: ctx.accounts.mint_pda.to_account_info(),
+                from: ctx.accounts.user_token.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        );
+        token::burn(cpi_ctx, amount)?;
 
         Ok(())
     }
@@ -55,6 +73,7 @@ pub struct CreateMint<'info> {
 pub struct MintTo<'info> {
      #[account(
     mut,
+    address = MINT_ADDRESS.parse::<Pubkey>().unwrap()
     )]
     pub mint_pda: Account<'info, Mint>,
 
@@ -69,3 +88,23 @@ pub struct MintTo<'info> {
 }
 
 
+#[derive(Accounts)]
+#[instruction(mint_authority_bump: u8)]
+pub struct Burn<'info> {
+    //NEED TO CHECK
+    #[account(mut,
+    address = MINT_ADDRESS.parse::<Pubkey>().unwrap()
+    )]
+    pub mint_pda: Account<'info, Mint>,
+
+    // see `token::Burn.to`
+    #[account(mut)]
+    pub user_token: Account<'info, TokenAccount>,
+
+    // The authority allowed to mutate the above ⬆️
+    pub user: Signer<'info>,
+
+        // SPL Token Program
+    pub token_program: Program<'info, Token>,
+
+}
