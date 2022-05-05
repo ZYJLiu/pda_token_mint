@@ -12,7 +12,7 @@ pub mod pda_token {
 
     pub fn create_mint(ctx: Context<CreateMint>, name: String) -> Result<()> {
 
-        let (pda, bump) = Pubkey::find_program_address(&[&name.as_ref()], ctx.program_id);
+        let (pda, bump) = Pubkey::find_program_address(&[ctx.accounts.merchant.key().as_ref()], ctx.program_id);
 
         let merchant = &mut ctx.accounts.merchant;
         merchant.name = name;
@@ -71,7 +71,7 @@ pub struct CreateMint<'info> {
 
     #[account(
         init,
-        seeds = [&name.as_bytes()],
+        seeds = [merchant.key().as_ref()],
         bump,
         payer = user,
         mint::decimals = 2,
@@ -127,4 +127,6 @@ pub struct Merchant {
     pub name: String,
     pub mint: Pubkey,
     pub bump: u8,
+    pub discount: u8,
+    pub cash_back: u8
 }
