@@ -25,6 +25,8 @@ let merchant: Keypair;
 let merchant2: Keypair;
 let mint: PublicKey;
 let mint_bump: Number;
+let mint2: PublicKey;
+let mint_bump2: Number;
 
 describe("pda_token", () => {
   const provider = anchor.Provider.local();
@@ -67,47 +69,46 @@ describe("pda_token", () => {
       console.log(error);
     }
 
-    // const [mint2, mint_bump2] = await PublicKey.findProgramAddress(
-    //   [Buffer.from(anchor.utils.bytes.utf8.encode("test2"))],
-    //   program.programId
-    // );
+    merchant2 = Keypair.generate();
 
-    // merchant2 = Keypair.generate();
+    [mint2, mint_bump2] = await PublicKey.findProgramAddress(
+      [merchant2.publicKey.toBuffer()],
+      program.programId
+    );
 
-    // try {
-    //   await program.rpc.createMint("test2", {
-    //     accounts: {
-    //       merchant: merchant2.publicKey,
-    //       mintPda: mint2,
-    //       user: userWallet.publicKey,
-    //       systemProgram: anchor.web3.SystemProgram.programId,
-    //       rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-    //       tokenProgram: TOKEN_PROGRAM_ID,
-    //     },
-    //     signers: [merchant2],
-    //   });
+    try {
+      await program.rpc.createMint("test2", {
+        accounts: {
+          merchant: merchant2.publicKey,
+          mintPda: mint2,
+          user: userWallet.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        signers: [merchant2],
+      });
 
-    //   // get Token Mint Address
-    //   const mintAddress2 = await getMint(connection, mint2);
-    //   console.log("Mint Authority:", mintAddress2.mintAuthority.toString());
-    //   console.log("Mint Address:", mint2.toString());
+      // get Token Mint Address
+      const mintAddress2 = await getMint(connection, mint2);
+      console.log("Mint Authority:", mintAddress2.mintAuthority.toString());
+      console.log("Mint Address:", mint2.toString());
 
-    //   assert.isTrue(mintAddress2.mintAuthority.equals(mint2));
-    // } catch (error) {
-    //   console.log(error);
-    // }
+      assert.isTrue(mintAddress2.mintAuthority.equals(mint2));
+    } catch (error) {
+      console.log(error);
+    }
 
-    // let merchantAccount = await program.account.merchant.fetch(
-    //   merchant.publicKey
-    // );
+    let merchantAccount = await program.account.merchant.fetch(
+      merchant.publicKey
+    );
 
-    // let merchantAccount2 = await program.account.merchant.fetch(
-    //   merchant2.publicKey
-    // );
+    let merchantAccount2 = await program.account.merchant.fetch(
+      merchant2.publicKey
+    );
 
-    // console.log("Merchant Mint:", merchantAccount.mint.toString());
-    // console.log("Merchant2 Mint:", merchantAccount2.mint.toString());
-    // // console.log(test2);
+    console.log("Merchant Mint:", merchantAccount.mint.toString());
+    console.log("Merchant2 Mint:", merchantAccount2.mint.toString());
   });
 
   it("Mint Tokens", async () => {
@@ -128,7 +129,7 @@ describe("pda_token", () => {
     );
 
     const data = await program.account.merchant.fetch(merchant.publicKey);
-    console.log(data);
+    // console.log(data);
 
     try {
       await program.rpc.mintTo(new anchor.BN(5_000_000), {
@@ -152,105 +153,95 @@ describe("pda_token", () => {
     console.log("Token Balance:", balance);
   });
 
-  // it("Mint Tokens", async () => {
-  //   const Wallet = Keypair.generate();
-  //   const AirdropSignature = await connection.requestAirdrop(
-  //     Wallet.publicKey,
-  //     LAMPORTS_PER_SOL
-  //   );
+  it("Mint2 Tokens", async () => {
+    const Wallet = Keypair.generate();
+    const AirdropSignature = await connection.requestAirdrop(
+      Wallet.publicKey,
+      LAMPORTS_PER_SOL
+    );
 
-  //   await connection.confirmTransaction(AirdropSignature);
+    await connection.confirmTransaction(AirdropSignature);
 
-  //   const [mint, mint_bump] = await PublicKey.findProgramAddress(
-  //     [Buffer.from(anchor.utils.bytes.utf8.encode("test2"))],
-  //     program.programId
-  //   );
+    // Get the token account of the fromWallet address, and if it does not exist, create it
+    const TokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      Wallet,
+      mint2,
+      Wallet.publicKey
+    );
 
-  //   // Get the token account of the fromWallet address, and if it does not exist, create it
-  //   const TokenAccount = await getOrCreateAssociatedTokenAccount(
-  //     connection,
-  //     Wallet,
-  //     mint,
-  //     Wallet.publicKey
-  //   );
+    try {
+      await program.rpc.mintTo(new anchor.BN(3_000_000), {
+        accounts: {
+          merchant: merchant2.publicKey,
+          mintPda: mint2,
+          userToken: TokenAccount.address,
+          user: provider.wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+    }
 
-  //   try {
-  //     await program.rpc.mintTo(new anchor.BN(3_000_000), {
-  //       accounts: {
-  //         merchant: merchant2.publicKey,
-  //         mintPda: mint,
-  //         userToken: TokenAccount.address,
-  //         user: provider.wallet.publicKey,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //     });
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
+    const balance = (
+      await connection.getTokenAccountBalance(TokenAccount.address)
+    ).value.amount;
 
-  //   const balance = (
-  //     await connection.getTokenAccountBalance(TokenAccount.address)
-  //   ).value.amount;
+    // assert.equal(balance, 5000);
+    console.log("Token2 Balance:", balance);
+  });
 
-  //   // assert.equal(balance, 5000);
-  //   console.log("Token Balance:", balance);
-  // });
+  it("Burn", async () => {
+    const Wallet = Keypair.generate();
+    const AirdropSignature = await connection.requestAirdrop(
+      Wallet.publicKey,
+      LAMPORTS_PER_SOL
+    );
 
-  // it("Burn", async () => {
-  //   const Wallet = Keypair.generate();
-  //   const AirdropSignature = await connection.requestAirdrop(
-  //     Wallet.publicKey,
-  //     LAMPORTS_PER_SOL
-  //   );
+    await connection.confirmTransaction(AirdropSignature);
 
-  //   await connection.confirmTransaction(AirdropSignature);
+    // Get the token account of the fromWallet address, and if it does not exist, create it
+    const TokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      Wallet,
+      mint,
+      Wallet.publicKey
+    );
 
-  //   const [mint, mint_bump] = await PublicKey.findProgramAddress(
-  //     [Buffer.from(anchor.utils.bytes.utf8.encode("test"))],
-  //     program.programId
-  //   );
+    try {
+      await program.rpc.mintTo(new anchor.BN(5_000_000), {
+        accounts: {
+          merchant: merchant.publicKey,
+          mintPda: mint,
+          userToken: TokenAccount.address,
+          user: provider.wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+    }
 
-  //   // Get the token account of the fromWallet address, and if it does not exist, create it
-  //   const TokenAccount = await getOrCreateAssociatedTokenAccount(
-  //     connection,
-  //     Wallet,
-  //     mint,
-  //     Wallet.publicKey
-  //   );
+    try {
+      await program.rpc.burn(new anchor.BN(3_000_000), {
+        accounts: {
+          mintPda: mint,
+          userToken: TokenAccount.address,
+          user: Wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        signers: [Wallet],
+      });
+    } catch (error) {
+      console.log(error);
+    }
 
-  //   try {
-  //     await program.rpc.mintTo(new anchor.BN(5_000_000), {
-  //       accounts: {
-  //         merchant: merchant.publicKey,
-  //         mintPda: mint,
-  //         userToken: TokenAccount.address,
-  //         user: provider.wallet.publicKey,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //     });
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
+    const balance = (
+      await connection.getTokenAccountBalance(TokenAccount.address)
+    ).value.amount;
 
-  //   try {
-  //     await program.rpc.burn(new anchor.BN(3_000_000), {
-  //       accounts: {
-  //         mintPda: mint,
-  //         userToken: TokenAccount.address,
-  //         user: Wallet.publicKey,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //       signers: [Wallet],
-  //     });
-  //   } catch (error) {
-  //     console.log(error);
-  //   }
-
-  //   const balance = (
-  //     await connection.getTokenAccountBalance(TokenAccount.address)
-  //   ).value.amount;
-
-  //   // assert.equal(balance, 5000);
-  //   console.log("Token Balance:", balance);
-  // });
+    // assert.equal(balance, 5000);
+    console.log("Token Balance:", balance);
+  });
 });

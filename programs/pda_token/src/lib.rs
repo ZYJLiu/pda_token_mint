@@ -22,10 +22,10 @@ pub mod pda_token {
     }
 
     pub fn mint_to(ctx: Context<MintTo>, amount: u64) -> Result<()> {
-        let name = ctx.accounts.merchant.name.as_bytes();
+        let name = ctx.accounts.merchant.key();
 
 
-        let seeds = &[name, &[ctx.accounts.merchant.bump]];
+        let seeds = &[name.as_ref(), &[ctx.accounts.merchant.bump]];
         let signer = [&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(
