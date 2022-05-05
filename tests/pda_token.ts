@@ -22,6 +22,7 @@ import {
 const { assert, expect } = require("chai");
 
 let merchant: Keypair;
+let merchant2: Keypair;
 
 describe("pda_token", () => {
   const provider = anchor.Provider.local();
@@ -39,7 +40,7 @@ describe("pda_token", () => {
     merchant = Keypair.generate();
 
     try {
-      await program.rpc.createMint("test", mint, {
+      await program.rpc.createMint("test", {
         accounts: {
           merchant: merchant.publicKey,
           mintPda: mint,
@@ -66,10 +67,10 @@ describe("pda_token", () => {
       program.programId
     );
 
-    const merchant2 = Keypair.generate();
+    merchant2 = Keypair.generate();
 
     try {
-      await program.rpc.createMint("test2", mint2, {
+      await program.rpc.createMint("test2", {
         accounts: {
           merchant: merchant2.publicKey,
           mintPda: mint2,
@@ -130,8 +131,9 @@ describe("pda_token", () => {
     console.log(data);
 
     try {
-      await program.rpc.mintTo(data.name, data.bump, new anchor.BN(5_000_000), {
+      await program.rpc.mintTo(new anchor.BN(5_000_000), {
         accounts: {
+          merchant: merchant.publicKey,
           mintPda: mint,
           userToken: TokenAccount.address,
           user: provider.wallet.publicKey,
@@ -173,8 +175,9 @@ describe("pda_token", () => {
     );
 
     try {
-      await program.rpc.mintTo("test2", mint_bump, new anchor.BN(3_000_000), {
+      await program.rpc.mintTo(new anchor.BN(3_000_000), {
         accounts: {
+          merchant: merchant2.publicKey,
           mintPda: mint,
           userToken: TokenAccount.address,
           user: provider.wallet.publicKey,
@@ -216,8 +219,9 @@ describe("pda_token", () => {
     );
 
     try {
-      await program.rpc.mintTo("test", mint_bump, new anchor.BN(5_000_000), {
+      await program.rpc.mintTo(new anchor.BN(5_000_000), {
         accounts: {
+          merchant: merchant.publicKey,
           mintPda: mint,
           userToken: TokenAccount.address,
           user: provider.wallet.publicKey,

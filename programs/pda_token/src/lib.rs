@@ -10,20 +10,22 @@ pub const MINT_ADDRESS: &str = "HpK7u61kJEeoCUn8iMay7A8VzxWSovDL35FMvqLA9LsJ";
 pub mod pda_token {
     use super::*;
 
-    pub fn create_mint(ctx: Context<CreateMint>, name: String, mint: Pubkey) -> Result<()> {
+    pub fn create_mint(ctx: Context<CreateMint>, name: String) -> Result<()> {
 
         let (pda, bump) = Pubkey::find_program_address(&[&name.as_ref()], ctx.program_id);
 
         let merchant = &mut ctx.accounts.merchant;
         merchant.name = name;
-        merchant.mint = mint;
+        merchant.mint = pda;
         merchant.bump = bump;
         Ok(())
     }
 
-    pub fn mint_to(ctx: Context<MintTo>, name: String, mint_authority_bump: u8, amount: u64) -> Result<()> {
-        
-        let seeds = &[name.as_bytes(), &[mint_authority_bump]];
+    pub fn mint_to(ctx: Context<MintTo>, amount: u64) -> Result<()> {
+        let name = ctx.accounts.merchant.name.as_bytes();
+
+
+        let seeds = &[name, &[ctx.accounts.merchant.bump]];
         let signer = [&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -56,13 +58,6 @@ pub mod pda_token {
     }
 }
 
-#[account]
-pub struct Merchant {
-    pub name: String,
-    pub mint: Pubkey,
-    pub bump: u8,
-}
-
 
 #[derive(Accounts)]
 #[instruction(name: String)]
@@ -79,7 +74,7 @@ pub struct CreateMint<'info> {
         seeds = [&name.as_bytes()],
         bump,
         payer = user,
-        mint::decimals = 6,
+        mint::decimals = 2,
         mint::authority = mint_pda, 
         
     )]
@@ -93,7 +88,9 @@ pub struct CreateMint<'info> {
 
 #[derive(Accounts)]
 pub struct MintTo<'info> {
-     #[account(mut)]
+    #[account()]
+    pub merchant: Account<'info, Merchant>,
+    #[account(mut)]
     pub mint_pda: Account<'info, Mint>,
 
     // User Token Account
@@ -123,4 +120,11 @@ pub struct Burn<'info> {
         // SPL Token Program
     pub token_program: Program<'info, Token>,
 
+}
+
+#[account]
+pub struct Merchant {
+    pub name: String,
+    pub mint: Pubkey,
+    pub bump: u8,
 }
