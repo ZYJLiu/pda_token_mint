@@ -10,13 +10,20 @@ pub const MINT_ADDRESS: &str = "HpK7u61kJEeoCUn8iMay7A8VzxWSovDL35FMvqLA9LsJ";
 pub mod pda_token {
     use super::*;
 
-    pub fn create_mint(_ctx: Context<CreateMint>) -> Result<()> {
+    pub fn create_mint(ctx: Context<CreateMint>, name: String, mint: Pubkey) -> Result<()> {
+
+        let (pda, bump) = Pubkey::find_program_address(&[&name.as_ref()], ctx.program_id);
+
+        let merchant = &mut ctx.accounts.merchant;
+        merchant.name = name;
+        merchant.mint = mint;
+        merchant.bump = bump;
         Ok(())
     }
 
-    pub fn mint_to(ctx: Context<MintTo>, mint_authority_bump: u8, amount: u64) -> Result<()> {
+    pub fn mint_to(ctx: Context<MintTo>, name: String, mint_authority_bump: u8, amount: u64) -> Result<()> {
         
-        let seeds = &[b"my-mint-seed".as_ref(), &[mint_authority_bump]];
+        let seeds = &[name.as_bytes(), &[mint_authority_bump]];
         let signer = [&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -33,7 +40,7 @@ pub mod pda_token {
         Ok(())
     }
 
-    pub fn burn(ctx: Context<Burn>,  mint_authority_bump: u8, amount: u64) -> Result<()> {
+    pub fn burn(ctx: Context<Burn>, amount: u64) -> Result<()> {
 
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -49,12 +56,27 @@ pub mod pda_token {
     }
 }
 
+#[account]
+pub struct Merchant {
+    pub name: String,
+    pub mint: Pubkey,
+    pub bump: u8,
+}
+
 
 #[derive(Accounts)]
+#[instruction(name: String)]
 pub struct CreateMint<'info> {
     #[account(
         init,
-        seeds = [b"my-mint-seed".as_ref()],
+        payer = user,
+        space = 100 // TODO: calculate space
+    )]
+    pub merchant: Account<'info, Merchant>,
+
+    #[account(
+        init,
+        seeds = [&name.as_bytes()],
         bump,
         payer = user,
         mint::decimals = 6,
@@ -71,10 +93,7 @@ pub struct CreateMint<'info> {
 
 #[derive(Accounts)]
 pub struct MintTo<'info> {
-     #[account(
-    mut,
-    address = MINT_ADDRESS.parse::<Pubkey>().unwrap()
-    )]
+     #[account(mut)]
     pub mint_pda: Account<'info, Mint>,
 
     // User Token Account
@@ -89,12 +108,9 @@ pub struct MintTo<'info> {
 
 
 #[derive(Accounts)]
-#[instruction(mint_authority_bump: u8)]
 pub struct Burn<'info> {
     //NEED TO CHECK
-    #[account(mut,
-    address = MINT_ADDRESS.parse::<Pubkey>().unwrap()
-    )]
+    #[account(mut)]
     pub mint_pda: Account<'info, Mint>,
 
     // see `token::Burn.to`

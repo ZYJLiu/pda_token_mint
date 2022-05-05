@@ -16,9 +16,12 @@ import {
   getMint,
   getOrCreateAssociatedTokenAccount,
   createAssociatedTokenAccount,
+  getAccount,
 } from "@solana/spl-token";
 
 const { assert, expect } = require("chai");
+
+let merchant: Keypair;
 
 describe("pda_token", () => {
   const provider = anchor.Provider.local();
@@ -29,19 +32,23 @@ describe("pda_token", () => {
 
   it("Can create a token account from seeds pda", async () => {
     const [mint, mint_bump] = await PublicKey.findProgramAddress(
-      [Buffer.from(anchor.utils.bytes.utf8.encode("my-mint-seed"))],
+      [Buffer.from(anchor.utils.bytes.utf8.encode("test"))],
       program.programId
     );
 
+    merchant = Keypair.generate();
+
     try {
-      await program.rpc.createMint({
+      await program.rpc.createMint("test", mint, {
         accounts: {
+          merchant: merchant.publicKey,
           mintPda: mint,
           user: userWallet.publicKey,
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           tokenProgram: TOKEN_PROGRAM_ID,
         },
+        signers: [merchant],
       });
 
       // get Token Mint Address
@@ -53,6 +60,48 @@ describe("pda_token", () => {
     } catch (error) {
       console.log(error);
     }
+
+    const [mint2, mint_bump2] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("test2"))],
+      program.programId
+    );
+
+    const merchant2 = Keypair.generate();
+
+    try {
+      await program.rpc.createMint("test2", mint2, {
+        accounts: {
+          merchant: merchant2.publicKey,
+          mintPda: mint2,
+          user: userWallet.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+        signers: [merchant2],
+      });
+
+      // get Token Mint Address
+      const mintAddress2 = await getMint(connection, mint2);
+      console.log("Mint Authority:", mintAddress2.mintAuthority.toString());
+      console.log("Mint Address:", mint2.toString());
+
+      assert.isTrue(mintAddress2.mintAuthority.equals(mint2));
+    } catch (error) {
+      console.log(error);
+    }
+
+    let [test] = await Promise.all([
+      program.account.merchant.fetch(merchant.publicKey),
+    ]);
+
+    let [test2] = await Promise.all([
+      program.account.merchant.fetch(merchant2.publicKey),
+    ]);
+
+    console.log(test.mint.toString());
+    console.log(test2.mint.toString());
+    // console.log(test2);
   });
 
   it("Mint Tokens", async () => {
@@ -64,8 +113,8 @@ describe("pda_token", () => {
 
     await connection.confirmTransaction(AirdropSignature);
 
-    const [mintPDA, mint_bump] = await PublicKey.findProgramAddress(
-      [Buffer.from(anchor.utils.bytes.utf8.encode("my-mint-seed"))],
+    const [mint, mint_bump] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("test"))],
       program.programId
     );
 
@@ -73,14 +122,60 @@ describe("pda_token", () => {
     const TokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       Wallet,
-      mintPDA,
+      mint,
+      Wallet.publicKey
+    );
+
+    const data = await program.account.merchant.fetch(merchant.publicKey);
+    console.log(data);
+
+    try {
+      await program.rpc.mintTo(data.name, data.bump, new anchor.BN(5_000_000), {
+        accounts: {
+          mintPda: mint,
+          userToken: TokenAccount.address,
+          user: provider.wallet.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      });
+    } catch (error) {
+      console.log(error);
+    }
+
+    const balance = (
+      await connection.getTokenAccountBalance(TokenAccount.address)
+    ).value.amount;
+
+    // assert.equal(balance, 5000);
+    console.log("Token Balance:", balance);
+  });
+
+  it("Mint Tokens", async () => {
+    const Wallet = Keypair.generate();
+    const AirdropSignature = await connection.requestAirdrop(
+      Wallet.publicKey,
+      LAMPORTS_PER_SOL
+    );
+
+    await connection.confirmTransaction(AirdropSignature);
+
+    const [mint, mint_bump] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("test2"))],
+      program.programId
+    );
+
+    // Get the token account of the fromWallet address, and if it does not exist, create it
+    const TokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      Wallet,
+      mint,
       Wallet.publicKey
     );
 
     try {
-      await program.rpc.mintTo(mint_bump, new anchor.BN(5_000_000), {
+      await program.rpc.mintTo("test2", mint_bump, new anchor.BN(3_000_000), {
         accounts: {
-          mintPda: mintPDA,
+          mintPda: mint,
           userToken: TokenAccount.address,
           user: provider.wallet.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -107,8 +202,8 @@ describe("pda_token", () => {
 
     await connection.confirmTransaction(AirdropSignature);
 
-    const [mintPDA, mint_bump] = await PublicKey.findProgramAddress(
-      [Buffer.from(anchor.utils.bytes.utf8.encode("my-mint-seed"))],
+    const [mint, mint_bump] = await PublicKey.findProgramAddress(
+      [Buffer.from(anchor.utils.bytes.utf8.encode("test"))],
       program.programId
     );
 
@@ -116,14 +211,14 @@ describe("pda_token", () => {
     const TokenAccount = await getOrCreateAssociatedTokenAccount(
       connection,
       Wallet,
-      mintPDA,
+      mint,
       Wallet.publicKey
     );
 
     try {
-      await program.rpc.mintTo(mint_bump, new anchor.BN(5_000_000), {
+      await program.rpc.mintTo("test", mint_bump, new anchor.BN(5_000_000), {
         accounts: {
-          mintPda: mintPDA,
+          mintPda: mint,
           userToken: TokenAccount.address,
           user: provider.wallet.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
@@ -134,9 +229,9 @@ describe("pda_token", () => {
     }
 
     try {
-      await program.rpc.burn(mint_bump, new anchor.BN(3_000_000), {
+      await program.rpc.burn(new anchor.BN(3_000_000), {
         accounts: {
-          mintPda: mintPDA,
+          mintPda: mint,
           userToken: TokenAccount.address,
           user: Wallet.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
