@@ -4,8 +4,17 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount,};
 declare_id!("AA6w4TWeM86CJ1CzMsnxboF9d97xQLbcKXBz2vUtkQS7");
 
 
+
 #[program]
 pub mod pda_token {
+
+     // REPLACE ADDRESS of diam mint by running solana address -k .keys/usdc_mint.json
+    pub const USDC_MINT_ADDRESS: &str = "8Ncnd1gHntTjc5B1gHaDgtvgPrk6ePNxocS1mBordcGb";
+    // REPLACE ADDRESS of usdc mint by running solana address -k .keys/jun_mint.json
+    pub const JUN_MINT_ADDRESS: &str = "7iZnHH122PDPavHeeUtB36KZCNT1qV5R2PdyVcC6P3Zq";
+    // REPLACE ADDRESS of diam mint by running solana address -k .keys/diam_mint.json
+    pub const DIAM_MINT_ADDRESS: &str = "4vCNES4ohdTppYSVmAPJ8J4R8Gcae3kXa2SKXPYsx97C";
+
     use super::*;
 
     pub fn create_token_account(ctx: Context<CreateTokenAccount>) -> Result<()> {
@@ -24,10 +33,10 @@ pub mod pda_token {
     }
 
     pub fn mint_to(ctx: Context<MintTo>, amount: u64) -> Result<()> {
-        let name = ctx.accounts.merchant.key();
+        let merchant = ctx.accounts.merchant.key();
 
 
-        let seeds = &[name.as_ref(), &[ctx.accounts.merchant.bump]];
+        let seeds = &[merchant.as_ref(), &[ctx.accounts.merchant.bump]];
         let signer = [&seeds[..]];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -56,7 +65,7 @@ pub mod pda_token {
         Ok(())
     }
 
-    pub fn burn(ctx: Context<Burn>, amount: u64, usdc_bump: u8) -> Result<()> {
+    pub fn burn(ctx: Context<Burn>, amount: u64,) -> Result<()> {
 
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -69,6 +78,7 @@ pub mod pda_token {
         token::burn(cpi_ctx, amount)?;
 
         // transfer USDC merchant.
+        let (usdc_pda, usdc_bump) = Pubkey::find_program_address(&[ctx.accounts.usdc_mint.key().as_ref()], ctx.program_id);
         let usdc_mint_address = ctx.accounts.usdc_mint.key();
         let seeds = &[usdc_mint_address.as_ref(), &[usdc_bump]];
         let signer = [&seeds[..]];
@@ -86,6 +96,96 @@ pub mod pda_token {
         let usdc_amount = amount; // TODO: Change the formula
         token::transfer(cpi_ctx, usdc_amount)?;
 
+        // transfer USDC merchant.
+        let (jun_pda, jun_bump) = Pubkey::find_program_address(&[ctx.accounts.jun_mint.key().as_ref()], ctx.program_id);
+        let jun_mint_address = ctx.accounts.jun_mint.key();
+        let seeds = &[jun_mint_address.as_ref(), &[jun_bump]];
+        let signer = [&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.program_jun_token.to_account_info(),
+                authority: ctx.accounts.program_jun_token.to_account_info(),
+                to: ctx.accounts.user_jun_token.to_account_info(),
+            },
+            &signer,
+        );
+
+        let jun_amount = amount; // TODO: Change the formula
+        token::transfer(cpi_ctx, jun_amount)?;
+
+        Ok(())
+    }
+
+    pub fn burn_diam(ctx: Context<BurnDiam>, amount: u64,) -> Result<()> {
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            token::Burn {
+                mint: ctx.accounts.diam_pda.to_account_info(),
+                from: ctx.accounts.user_diam_token.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        );
+        token::burn(cpi_ctx, amount)?;
+
+        // transfer USDC merchant.
+        let (usdc_pda, usdc_bump) = Pubkey::find_program_address(&[ctx.accounts.usdc_mint.key().as_ref()], ctx.program_id);
+        let usdc_mint_address = ctx.accounts.usdc_mint.key();
+        let seeds = &[usdc_mint_address.as_ref(), &[usdc_bump]];
+        let signer = [&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.program_usdc_token.to_account_info(),
+                authority: ctx.accounts.program_usdc_token.to_account_info(),
+                to: ctx.accounts.merchant_usdc_token.to_account_info(),
+            },
+            &signer,
+        );
+
+        let usdc_amount = amount * 90/100; // TODO: Change the formula
+        token::transfer(cpi_ctx, usdc_amount)?;
+
+        // transfer USDC merchant.
+        let (jun_pda, jun_bump) = Pubkey::find_program_address(&[ctx.accounts.jun_mint.key().as_ref()], ctx.program_id);
+        let jun_mint_address = ctx.accounts.jun_mint.key();
+        let seeds = &[jun_mint_address.as_ref(), &[jun_bump]];
+        let signer = [&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::Transfer {
+                from: ctx.accounts.program_jun_token.to_account_info(),
+                authority: ctx.accounts.program_jun_token.to_account_info(),
+                to: ctx.accounts.user_jun_token.to_account_info(),
+            },
+            &signer,
+        );
+
+        let jun_amount = amount; // TODO: Change the formula
+        token::transfer(cpi_ctx, jun_amount)?;
+
+        let merchant = ctx.accounts.merchant.key();
+
+        let seeds = &[merchant.as_ref(), &[ctx.accounts.merchant.bump]];
+        let signer = [&seeds[..]];
+
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            token::MintTo {
+                mint: ctx.accounts.merchant_pda.to_account_info(),
+                to: ctx.accounts.user_merchant_token.to_account_info(),
+                authority: ctx.accounts.merchant_pda.to_account_info(),
+            },
+            &signer,
+        );
+
+        let merchant_amount = amount * 10/100; // TODO: Change the formula
+        token::mint_to(cpi_ctx, merchant_amount)?;
+
         Ok(())
     }
 }
@@ -98,7 +198,7 @@ pub struct CreateTokenAccount<'info> {
         payer = payer,
 
         // We use the token mint as a seed for the mapping -> think "HashMap[seeds+bump] = pda"
-        seeds = [ mint.key().as_ref() ],
+        seeds = [mint.key().as_ref() ],
         bump,
 
         // Token Program wants to know what kind of token this token bag is for
@@ -182,16 +282,16 @@ pub struct MintTo<'info> {
 
 
 #[derive(Accounts)]
-#[instruction(usdc_bump: u8)]
+// #[instruction(usdc_bump: u8, jun_bump:u8)]
 pub struct Burn<'info> {
     //NEED TO CHECK
     // `token::Burn.mint`
     #[account(mut)]
-    pub mint_pda: Account<'info, Mint>,
+    pub mint_pda: Box<Account<'info, Mint>>,
 
     // `token::Burn.to`
     #[account(mut)]
-    pub user_token: Account<'info, TokenAccount>,
+    pub user_token: Box<Account<'info, TokenAccount>>,
 
     // The authority allowed to mutate the above ⬆️
     pub user: Signer<'info>,
@@ -200,19 +300,105 @@ pub struct Burn<'info> {
     // NOTE: seed not working not sure why 
     #[account(
         mut,
-        // seeds = [usdc_mint.key().as_ref()],
-        // bump = usdc_bump,
+        seeds = [USDC_MINT_ADDRESS.parse::<Pubkey>().unwrap().as_ref()],
+        bump,
     )]
-    pub program_usdc_token: Account<'info, TokenAccount>,
+    pub program_usdc_token: Box<Account<'info, TokenAccount>>,
 
     //NEED TO CHECK
     //Require for the PDA above 
-    // #[account(mut)]
-    pub usdc_mint: Account<'info, Mint>,
+    #[account(
+        address = USDC_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub usdc_mint: Box<Account<'info, Mint>>,
 
     // see `token::Transfer.to`
     #[account(mut)]
-    pub user_usdc_token: Account<'info, TokenAccount>,
+    pub user_usdc_token: Box<Account<'info, TokenAccount>>,
+
+    // NOTE: seed not working not sure why 
+     #[account(
+        mut,
+        seeds = [JUN_MINT_ADDRESS.parse::<Pubkey>().unwrap().as_ref()],
+        bump,
+    )]
+    pub program_jun_token: Box<Account<'info, TokenAccount>>,
+    
+    #[account(
+    mut,
+    address = JUN_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub jun_mint: Box<Account<'info, Mint>>,
+    
+    #[account(mut)]
+    pub user_jun_token: Box<Account<'info, TokenAccount>>,
+
+    // SPL Token Program
+    pub token_program: Program<'info, Token>,
+
+}
+
+#[derive(Accounts)]
+// #[instruction(usdc_bump: u8, jun_bump:u8)]
+pub struct BurnDiam<'info> {
+    //NEED TO CHECK
+    // `token::Burn.mint`
+    #[account(mut)]
+    pub diam_pda: Box<Account<'info, Mint>>,
+
+    // `token::Burn.to`
+    #[account(mut)]
+    pub user_diam_token: Box<Account<'info, TokenAccount>>,
+
+    // The authority allowed to mutate the above ⬆️
+    pub user: Signer<'info>,
+
+    // see `token::Transfer.from`
+    // NOTE: seed not working not sure why 
+    #[account(
+        mut,
+        seeds = [USDC_MINT_ADDRESS.parse::<Pubkey>().unwrap().as_ref()],
+        bump,
+    )]
+    pub program_usdc_token: Box<Account<'info, TokenAccount>>,
+
+    //NEED TO CHECK
+    //Require for the PDA above 
+    #[account(
+        address = USDC_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub usdc_mint: Box<Account<'info, Mint>>,
+
+    // see `token::Transfer.to`
+    #[account(mut)]
+    pub merchant_usdc_token: Box<Account<'info, TokenAccount>>,
+    
+    // NOTE: seed not working not sure why 
+     #[account(
+        mut,
+        seeds = [JUN_MINT_ADDRESS.parse::<Pubkey>().unwrap().as_ref()],
+        bump,
+    )]
+    pub program_jun_token: Box<Account<'info, TokenAccount>>,
+    
+    #[account(
+    mut,
+    address = JUN_MINT_ADDRESS.parse::<Pubkey>().unwrap(),
+    )]
+    pub jun_mint: Box<Account<'info, Mint>>,
+    
+    #[account(mut)]
+    pub user_jun_token: Box<Account<'info, TokenAccount>>,
+
+    #[account()]
+    pub merchant: Account<'info, Merchant>,
+
+    #[account(mut)]
+    pub merchant_pda: Box<Account<'info, Mint>>,
+
+    // `token::Burn.to`
+    #[account(mut)]
+    pub user_merchant_token: Box<Account<'info, TokenAccount>>,
 
     // SPL Token Program
     pub token_program: Program<'info, Token>,
